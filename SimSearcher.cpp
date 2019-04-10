@@ -14,7 +14,7 @@ SimSearcher::~SimSearcher()
 int SimSearcher::createIndex(const char *filename, unsigned q)
 {
 	char buf[1024];
-	FILE* 
+	FILE *fp = fopen(filename, "r");
 	return SUCCESS;
 }
 

@@ -1,6 +1,7 @@
 #pragma once
 #include <vector>
 #include <utility>
+#include <cstdio>
 
 const int SUCCESS = 0;
 const int FAILURE = 1;
