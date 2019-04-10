@@ -15,6 +15,7 @@ int main(int argc, char **argv)
 	searcher.createIndex(argv[1], q);
 	searcher.searchJaccard("query", jaccardThreshold, resultJaccard);
 	searcher.searchED("query", edThreshold, resultED);
+	searcher.print_inverted_list();
 
 	return 0;
 }
