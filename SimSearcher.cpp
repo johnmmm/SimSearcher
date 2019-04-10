@@ -75,7 +75,8 @@ int SimSearcher::searchED(const char *query, unsigned threshold, vector<pair<uns
 	{
 		if (nums[i] >= least_common)
 		{
-			unsigned distance = lenenshtein_distance(strs[i], query_str);
+            unsigned distance = lenenshtein_distance(strs[i], query_str);
+            printf("%d\n", distance);
 			if (distance <= threshold)
 			{
 				result.push_back(make_pair(i, distance));
@@ -88,7 +89,11 @@ int SimSearcher::searchED(const char *query, unsigned threshold, vector<pair<uns
 
 void SimSearcher::print_inverted_list()
 {
-	map<string, vector<unsigned> >::iterator it;
+	// for (int i = 0; i < 6; i++)
+    // {
+    //     printf("%s\n", strs[i].c_str());
+    // }
+    map<string, vector<unsigned> >::iterator it;
 	for (it = inverted_list.begin(); it != inverted_list.end(); it++)
 	{
 		printf("%s: ", (it->first).c_str());
@@ -112,7 +117,21 @@ void SimSearcher::print_ed_result(std::vector<std::pair<unsigned, unsigned> > &r
 
 unsigned SimSearcher::lenenshtein_distance(string a, string b)
 {
-	
-	
-	return 1;
+	unsigned size_a = a.size();
+    unsigned size_b = b.size();
+    unsigned dp[2][size_b+1];
+    for (int i = 0; i <= size_b; i++)
+        dp[0][i] = i;
+    for (int i = 0; i <= size_a; i++)
+    {
+        dp[i&1][0] = i;
+        for (int j = 1; j <= size_b; j++)
+        {
+            if (a[i-1] == b[j-1])
+                dp[i&1][j] = dp[(i-1)&1][j-1];
+            else
+                dp[i&1][j] = min( min(dp[i-1&1][j], dp[i&1][j-1]), dp[i-1&1][j-1] ) + 1;        
+        }
+    }
+	return dp[size_a&1][size_b];
 }
