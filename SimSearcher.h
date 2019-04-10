@@ -19,6 +19,7 @@ public:
 
 	vector<string> strs;
 	map<string, vector<unsigned> > inverted_list;
+	unsigned q_num;
 
 	int createIndex(const char *filename, unsigned q);
 	int searchJaccard(const char *query, double threshold, std::vector<std::pair<unsigned, double> > &result);
@@ -26,5 +27,6 @@ public:
 
 	void print_inverted_list();
 	void print_ed_result(std::vector<std::pair<unsigned, unsigned> > &result);
+	unsigned lenenshtein_distance(string a, string b);
 };
 

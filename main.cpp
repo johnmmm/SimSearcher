@@ -16,6 +16,7 @@ int main(int argc, char **argv)
 	searcher.searchJaccard("query", jaccardThreshold, resultJaccard);
 	searcher.searchED("query", edThreshold, resultED);
 	searcher.print_inverted_list();
+	searcher.print_ed_result(resultED);
 
 	return 0;
 }
