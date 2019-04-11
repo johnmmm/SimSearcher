@@ -28,6 +28,8 @@ int SimSearcher::createIndex(const char *filename, unsigned q)
         //jac:
         vector<string> tmp_tokens;
         tokenize(tmp_str, tmp_tokens);
+        vector<string>::iterator iter = unique(tmp_tokens.begin(), tmp_tokens.end());
+        tmp_tokens.erase(iter, tmp_tokens.end());
         str_tokens.push_back(tmp_tokens);
         if (s_min > tmp_tokens.size())
             s_min = tmp_tokens.size();
@@ -68,27 +70,33 @@ int SimSearcher::searchJaccard(const char *query, double threshold, vector<pair<
     string query_str = query;
     vector<string> query_tokens;
     tokenize(query_str, query_tokens);
+    vector<string>::iterator iter = unique(query_tokens.begin(), query_tokens.end());
+    query_tokens.erase(iter, query_tokens.end());
     unsigned str_size = query_tokens.size();
     int least_common = (int)ceil( max(threshold*str_size, (str_size+s_min)*threshold/(1.0+threshold) ) );
+    unsigned ids_total = strs.size();
+	int nums[ids_total];
+	for(unsigned i = 0; i < ids_total; i++)
+		nums[i] = 0;
 
 	map<string, vector<unsigned> > common_gram;
     for (unsigned i = 0; i < query_tokens.size(); i++)
 	{
 		string q_gram = query_tokens[i];
-		common_gram[q_gram] = inverted_list_jac[q_gram];
+		//common_gram[q_gram] = inverted_list_jac[q_gram];
+        vector<unsigned> common_gram = inverted_list_jac[q_gram];
+        for (unsigned j = 0; j < common_gram.size(); j++)
+            nums[common_gram[j]]++;
 	}
-    unsigned ids_total = strs.size();
-	int nums[ids_total];
-	for(unsigned i = 0; i < ids_total; i++)
-		nums[i] = 0;
-	map<string, vector<unsigned> >::iterator it;
-	for (it = common_gram.begin(); it != common_gram.end(); it++)
-	{
-		for (unsigned i = 0; i < it->second.size(); i++)
-		{
-			nums[it->second[i]]++;
-		}
-	}
+    
+	// map<string, vector<unsigned> >::iterator it;
+	// for (it = common_gram.begin(); it != common_gram.end(); it++)
+	// {
+	// 	for (unsigned i = 0; i < it->second.size(); i++)
+	// 	{
+	// 		nums[it->second[i]]++;
+	// 	}
+	// }
     // printf("least: %d\n", least_common);
     // for (int i = 0; i < ids_total; i++)
     // {
@@ -114,35 +122,30 @@ int SimSearcher::searchED(const char *query, unsigned threshold, vector<pair<uns
 	result.clear();
 	string query_str = query;
 	int least_common = query_str.size() - q_num + 1 - threshold * q_num;
-	map<string, vector<unsigned> > common_gram;
-	for (unsigned i = 0; i < query_str.size() - q_num + 1; i++)
-	{
-		string q_gram = query_str.substr(i, q_num);
-		common_gram[q_gram] = inverted_list_ed[q_gram];
-	}
-	unsigned ids_total = strs.size();
+    unsigned ids_total = strs.size();
 	int nums[ids_total];
 	for(unsigned i = 0; i < ids_total; i++)
 		nums[i] = 0;
-	map<string, vector<unsigned> >::iterator it;
-	for (it = common_gram.begin(); it != common_gram.end(); it++)
+
+	for (unsigned i = 0; i < query_str.size() - q_num + 1; i++)
 	{
-		for (unsigned i = 0; i < it->second.size(); i++)
-		{
-			nums[it->second[i]]++;
-		}
+		string q_gram = query_str.substr(i, q_num);
+		//common_gram[q_gram] = inverted_list_ed[q_gram];
+        vector<unsigned> common_gram = inverted_list_ed[q_gram];
+        for (unsigned j = 0; j < common_gram.size(); j++)
+            nums[common_gram[j]]++;
 	}
-	vector<unsigned> avail_dis;
+
 	for (unsigned i = 0; i < ids_total; i++)
 	{
 		if (nums[i] >= least_common)
 		{
             unsigned distance = lenenshtein_distance(strs[i], query_str);
             //printf("%d\n", distance);
-			if (distance <= threshold)
-			{
-				result.push_back(make_pair(i, distance));
-			}
+            if (distance <= threshold)
+            {
+                result.push_back(make_pair(i, distance));
+            }
 		}
 	}
 
@@ -215,7 +218,7 @@ unsigned SimSearcher::lenenshtein_distance(string a, string b)
     unsigned dp[2][size_b+1];
     for (int i = 0; i <= size_b; i++)
         dp[0][i] = i;
-    for (int i = 0; i <= size_a; i++)
+    for (int i = 1; i <= size_a; i++)
     {
         dp[i&1][0] = i;
         for (int j = 1; j <= size_b; j++)
@@ -223,7 +226,7 @@ unsigned SimSearcher::lenenshtein_distance(string a, string b)
             if (a[i-1] == b[j-1])
                 dp[i&1][j] = dp[(i-1)&1][j-1];
             else
-                dp[i&1][j] = min( min(dp[i-1&1][j], dp[i&1][j-1]), dp[i-1&1][j-1] ) + 1;        
+                dp[i&1][j] = min( min(dp[(i-1)&1][j], dp[i&1][j-1]), dp[(i-1)&1][j-1] ) + 1;        
         }
     }
 	return dp[size_a&1][size_b];
