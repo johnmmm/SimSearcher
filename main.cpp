@@ -10,12 +10,13 @@ int main(int argc, char **argv)
 	vector<pair<unsigned, double> > resultJaccard;
 
 	unsigned q = 3, edThreshold = 6;
-	double jaccardThreshold = 0.85;
+	double jaccardThreshold = 0.2;
 
 	searcher.createIndex(argv[1], q);
 	searcher.searchJaccard("query", jaccardThreshold, resultJaccard);
 	searcher.searchED("query", edThreshold, resultED);
 	//searcher.print_inverted_list();
+    searcher.print_jaccard_result(resultJaccard);
 	searcher.print_ed_result(resultED);
 
 	return 0;
