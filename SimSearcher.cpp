@@ -67,35 +67,8 @@ int SimSearcher::searchJaccard(const char *query, double threshold, vector<pair<
     set<string> query_tokens;
     tokenize(query_str, query_tokens);
 
-    unsigned str_size = query_tokens.size();
-    int least_common = (int)ceil( max(threshold*str_size, (str_size+s_min)*threshold/(1.0+threshold) ) );
-    unsigned ids_total = strs.size();
-	int nums[ids_total];
-	for(unsigned i = 0; i < ids_total; i++)
-		nums[i] = 0;
-
-    set<unsigned long long> query_hash;
-    search_jac_scancount(nums, query_tokens, query_hash);
+    search_jac_scancount(query_tokens, threshold, result);
     
-
-    // printf("least: %d\n", least_common);
-    // for (int i = 0; i < ids_total; i++)
-    // {
-    //     printf("%d: %d\n", i, nums[i]);
-    // }
-    for (unsigned i = 0; i < ids_total; i++)
-	{
-		if (nums[i] >= least_common)
-		{
-            //double distance = jaccard_distance(str_tokens[i], query_tokens, nums[i]);
-            double distance = new_jaccard_distance(str_tokens[i], query_hash);
-            //printf("%f\n", distance);
-			if (distance >= threshold)
-			{
-				result.push_back(make_pair(i, distance));
-			}
-		}
-	}
     return SUCCESS;
 }
 
@@ -103,28 +76,9 @@ int SimSearcher::searchED(const char *query, unsigned threshold, vector<pair<uns
 {
 	result.clear();
 	string query_str = query;
-	int least_common = query_str.size() - q_num + 1 - threshold * q_num;
-    unsigned ids_total = strs.size();
-	int nums[ids_total];
-	for(unsigned i = 0; i < ids_total; i++)
-		nums[i] = 0;
-
-    search_ed_scancount(nums, query_str);
 	
-	for (unsigned i = 0; i < ids_total; i++)
-	{
-		if (nums[i] >= least_common)
-		{
-            //unsigned distance = lenenshtein_distance(strs[i], query_str);
-            unsigned distance = new_lenenshtein_distance(strs[i], query_str, threshold);
-            //printf("%d\n", distance);
-            if (distance <= threshold)
-            {
-                result.push_back(make_pair(i, distance));
-            }
-		}
-	}
-
+    search_ed_scancount(query_str, threshold, result);
+	
 	return SUCCESS;
 }
 
@@ -135,30 +89,8 @@ void SimSearcher::print_inverted_list()
     //     printf("%s\n", strs[i].c_str());
     // }
     printf("inverted list jac:\n");
-    // map<string, vector<unsigned> >::iterator it1;
-	// for (it1 = inverted_list_jac.begin(); it1 != inverted_list_jac.end(); it1++)
-	// {
-	// 	printf("%s: ", (it1->first).c_str());
-	// 	unsigned size = it1->second.size();
-	// 	for (unsigned i = 0; i < size; i++)
-	// 	{
-	// 		printf("%d ", (it1->second)[i]);
-	// 	}
-	// 	printf("\n");
-	// }
 
-    // printf("inverted list ed:\n");
-    // map<string, vector<unsigned> >::iterator it;
-	// for (it = inverted_list_ed.begin(); it != inverted_list_ed.end(); it++)
-	// {
-	// 	printf("%s: ", (it->first).c_str());
-	// 	unsigned size = it->second.size();
-	// 	for (unsigned i = 0; i < size; i++)
-	// 	{
-	// 		printf("%d ", (it->second)[i]);
-	// 	}
-	// 	printf("\n");
-	// }
+    printf("inverted list ed:\n");
 }
 
 void SimSearcher::print_jaccard_result(std::vector<std::pair<unsigned, double> > &result)
@@ -179,7 +111,7 @@ void SimSearcher::print_ed_result(std::vector<std::pair<unsigned, unsigned> > &r
 	printf("\n");
 }
 
-double SimSearcher::jaccard_distance(vector<string> a, vector<string> b, unsigned same_gram)
+double SimSearcher::jaccard_distance(set<unsigned long long> a, set<unsigned long long> b, unsigned same_gram)
 {
     unsigned size_a = a.size();
     unsigned size_b = b.size();
@@ -290,9 +222,16 @@ unsigned SimSearcher::q_gram_hash(string strs)
     return hash_num;
 }
 
-void SimSearcher::search_jac_scancount(int *nums, set<string> query_tokens, set<unsigned long long> &query_hash)
+void SimSearcher::search_jac_scancount(set<string> query_tokens, double threshold, vector<pair<unsigned, double> > &result)
 {
-    //set<unsigned long long> query_hash;
+    unsigned str_size = query_tokens.size();
+    int least_common = (int)ceil( max(threshold*str_size, (str_size+s_min)*threshold/(1.0+threshold) ) );
+    unsigned ids_total = strs.size();
+	int nums[ids_total];
+	for(unsigned i = 0; i < ids_total; i++)
+		nums[i] = 0;
+    set<unsigned long long> query_hash;
+
     set<string>::iterator it1;
     for (it1 = query_tokens.begin(); it1 != query_tokens.end(); it1++)
     {
@@ -302,15 +241,49 @@ void SimSearcher::search_jac_scancount(int *nums, set<string> query_tokens, set<
         for (unsigned j = 0; j < common_gram.size(); j++)
             nums[common_gram[j]]++;
     }
+
+    for (unsigned i = 0; i < ids_total; i++)
+	{
+		if (nums[i] >= least_common)
+		{
+            double distance = jaccard_distance(str_tokens[i], query_hash, nums[i]);
+            //double distance = new_jaccard_distance(str_tokens[i], query_hash);
+            //printf("%f\n", distance);
+			if (distance >= threshold)
+			{
+				result.push_back(make_pair(i, distance));
+			}
+		}
+	}
 }
 
-void SimSearcher::search_ed_scancount(int *nums, string query_str)
+void SimSearcher::search_ed_scancount(string query_str, unsigned threshold, vector<pair<unsigned, unsigned> > &result)
 {
+    int least_common = query_str.size() - q_num + 1 - threshold * q_num;
+    unsigned ids_total = strs.size();
+	int nums[ids_total];
+	for(unsigned i = 0; i < ids_total; i++)
+		nums[i] = 0;
+    
     for (unsigned i = 0; i < query_str.size() - q_num + 1; i++)
 	{
 		string q_gram = query_str.substr(i, q_num);
         unsigned hash_num = q_gram_hash(q_gram);
         for (unsigned j = 0; j < inverted_list_ed_hash[hash_num].size(); j++)
             nums[inverted_list_ed_hash[hash_num][j]]++;
+	}
+
+    for (unsigned i = 0; i < ids_total; i++)
+	{
+		if (nums[i] >= least_common)
+		{
+            //unsigned distance = lenenshtein_distance(strs[i], query_str);
+            unsigned distance = new_lenenshtein_distance(strs[i], query_str, threshold);
+            //printf("%d\n", distance);
+            if (distance <= threshold)
+            {
+                result.push_back(make_pair(i, distance));
+            }
+		}
 	}
 }

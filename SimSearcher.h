@@ -41,7 +41,7 @@ public:
 	void print_inverted_list();
     void print_jaccard_result(std::vector<std::pair<unsigned, double> > &result);
 	void print_ed_result(std::vector<std::pair<unsigned, unsigned> > &result);
-    double jaccard_distance(vector<string> a, vector<string> b, unsigned same_gram);
+    double jaccard_distance(set<unsigned long long> a, set<unsigned long long> b, unsigned same_gram);
     double new_jaccard_distance(set<unsigned long long> a, set<unsigned long long> b);
 	unsigned lenenshtein_distance(string a, string b);
     unsigned new_lenenshtein_distance(string a, string b, unsigned threshold);
@@ -50,7 +50,7 @@ public:
     unsigned long long jaccard_hash(string strs);
     unsigned q_gram_hash(string strs);
 
-    void search_jac_scancount(int *nums, set<string> query_tokens, set<unsigned long long> &query_hash);
-    void search_ed_scancount(int *nums, string query_str);
+    void search_jac_scancount(set<string> query_tokens, double threshold, vector<pair<unsigned, double> > &result);
+    void search_ed_scancount(string query_str, unsigned threshold, vector<pair<unsigned, unsigned> > &result);
 };
 
