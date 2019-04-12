@@ -26,17 +26,26 @@ int SimSearcher::createIndex(const char *filename, unsigned q)
 		strs.push_back(tmp_str);
 
         //jac:
-        vector<string> tmp_tokens;
+        set<string> tmp_tokens;
         tokenize(tmp_str, tmp_tokens);
-        vector<string>::iterator iter = unique(tmp_tokens.begin(), tmp_tokens.end());
-        tmp_tokens.erase(iter, tmp_tokens.end());
-        str_tokens.push_back(tmp_tokens);
+        set<unsigned long long> tmp_hash;
+
+        // vector<string>::iterator iter = unique(tmp_tokens.begin(), tmp_tokens.end());
+        // tmp_tokens.erase(iter, tmp_tokens.end());
+        // str_tokens.push_back(tmp_tokens);
         if (s_min > tmp_tokens.size())
             s_min = tmp_tokens.size();
-        for (unsigned i = 0; i < tmp_tokens.size(); i++)
+        set<string>::iterator it1;
+        for (it1 = tmp_tokens.begin(); it1 != tmp_tokens.end(); it1++)
         {
-            inverted_list_jac[tmp_tokens[i]].push_back(tmp_num);
+            inverted_list_jac[jaccard_hash(*it1)].push_back(tmp_num);
+            tmp_hash.insert(jaccard_hash(*it1));
         }
+        str_tokens.push_back(tmp_hash);
+        // for (unsigned i = 0; i < tmp_tokens.size(); i++)
+        // {
+        //     inverted_list_jac[tmp_tokens[i]].push_back(tmp_num);
+        // }
 
         //ed:
 		for (unsigned i = 0; i < n - q + 1; i++)
@@ -47,12 +56,12 @@ int SimSearcher::createIndex(const char *filename, unsigned q)
 		tmp_num++;
 	}
 
-    map<string, vector<unsigned> >::iterator it1;
-	for (it1 = inverted_list_jac.begin(); it1 != inverted_list_jac.end(); it1++)
-	{
-		vector<unsigned>::iterator iter = unique(it1->second.begin(), it1->second.end());
-		it1->second.erase(iter, it1->second.end());
-	}
+    // map<string, vector<unsigned> >::iterator it1;
+	// for (it1 = inverted_list_jac.begin(); it1 != inverted_list_jac.end(); it1++)
+	// {
+	// 	vector<unsigned>::iterator iter = unique(it1->second.begin(), it1->second.end());
+	// 	it1->second.erase(iter, it1->second.end());
+	// }
 
 	map<string, vector<unsigned> >::iterator it2;
 	for (it2 = inverted_list_ed.begin(); it2 != inverted_list_ed.end(); it2++)
@@ -68,10 +77,11 @@ int SimSearcher::searchJaccard(const char *query, double threshold, vector<pair<
 {
 	result.clear();
     string query_str = query;
-    vector<string> query_tokens;
+    set<string> query_tokens;
     tokenize(query_str, query_tokens);
-    vector<string>::iterator iter = unique(query_tokens.begin(), query_tokens.end());
-    query_tokens.erase(iter, query_tokens.end());
+
+    // vector<string>::iterator iter = unique(query_tokens.begin(), query_tokens.end());
+    // query_tokens.erase(iter, query_tokens.end());
     unsigned str_size = query_tokens.size();
     int least_common = (int)ceil( max(threshold*str_size, (str_size+s_min)*threshold/(1.0+threshold) ) );
     unsigned ids_total = strs.size();
@@ -79,15 +89,27 @@ int SimSearcher::searchJaccard(const char *query, double threshold, vector<pair<
 	for(unsigned i = 0; i < ids_total; i++)
 		nums[i] = 0;
 
-	map<string, vector<unsigned> > common_gram;
-    for (unsigned i = 0; i < query_tokens.size(); i++)
-	{
-		string q_gram = query_tokens[i];
-		//common_gram[q_gram] = inverted_list_jac[q_gram];
-        vector<unsigned> common_gram = inverted_list_jac[q_gram];
+    set<unsigned long long> query_hash;
+    set<string>::iterator it1;
+    for (it1 = query_tokens.begin(); it1 != query_tokens.end(); it1++)
+    {
+        unsigned long long tmp_long_long = jaccard_hash(*it1);
+        query_hash.insert(tmp_long_long);
+        vector<unsigned> common_gram = inverted_list_jac[tmp_long_long];
         for (unsigned j = 0; j < common_gram.size(); j++)
             nums[common_gram[j]]++;
-	}
+    }
+
+    //这里搞遍历
+	// map<string, vector<unsigned> > common_gram;
+    // for (unsigned i = 0; i < query_tokens.size(); i++)
+	// {
+	// 	string q_gram = query_tokens[i];
+	// 	//common_gram[q_gram] = inverted_list_jac[q_gram];
+    //     vector<unsigned> common_gram = inverted_list_jac[q_gram];
+    //     for (unsigned j = 0; j < common_gram.size(); j++)
+    //         nums[common_gram[j]]++;
+	// }
     
 	// map<string, vector<unsigned> >::iterator it;
 	// for (it = common_gram.begin(); it != common_gram.end(); it++)
@@ -106,7 +128,8 @@ int SimSearcher::searchJaccard(const char *query, double threshold, vector<pair<
 	{
 		if (nums[i] >= least_common)
 		{
-            double distance = jaccard_distance(str_tokens[i], query_tokens, nums[i]);
+            //double distance = jaccard_distance(str_tokens[i], query_tokens, nums[i]);
+            double distance = new_jaccard_distance(str_tokens[i], query_hash);
             //printf("%f\n", distance);
 			if (distance >= threshold)
 			{
@@ -159,17 +182,17 @@ void SimSearcher::print_inverted_list()
     //     printf("%s\n", strs[i].c_str());
     // }
     printf("inverted list jac:\n");
-    map<string, vector<unsigned> >::iterator it1;
-	for (it1 = inverted_list_jac.begin(); it1 != inverted_list_jac.end(); it1++)
-	{
-		printf("%s: ", (it1->first).c_str());
-		unsigned size = it1->second.size();
-		for (unsigned i = 0; i < size; i++)
-		{
-			printf("%d ", (it1->second)[i]);
-		}
-		printf("\n");
-	}
+    // map<string, vector<unsigned> >::iterator it1;
+	// for (it1 = inverted_list_jac.begin(); it1 != inverted_list_jac.end(); it1++)
+	// {
+	// 	printf("%s: ", (it1->first).c_str());
+	// 	unsigned size = it1->second.size();
+	// 	for (unsigned i = 0; i < size; i++)
+	// 	{
+	// 		printf("%d ", (it1->second)[i]);
+	// 	}
+	// 	printf("\n");
+	// }
 
     printf("inverted list ed:\n");
     map<string, vector<unsigned> >::iterator it;
@@ -211,6 +234,19 @@ double SimSearcher::jaccard_distance(vector<string> a, vector<string> b, unsigne
     return jd;
 }
 
+double SimSearcher::new_jaccard_distance(set<unsigned long long> a, set<unsigned long long> b)
+{
+    unsigned size_a = a.size();
+    unsigned size_b = b.size();
+    int cnt = 0;
+    for (auto w : a)
+    {
+        if (b.find(w) != b.end())
+            cnt++;
+    }
+    return ((double)cnt / (double)(size_a + size_b - cnt));
+}
+
 unsigned SimSearcher::lenenshtein_distance(string a, string b)
 {
 	unsigned size_a = a.size();
@@ -232,12 +268,23 @@ unsigned SimSearcher::lenenshtein_distance(string a, string b)
 	return dp[size_a&1][size_b];
 }
 
-void SimSearcher::tokenize(string str1, vector<string> &res)
+void SimSearcher::tokenize(string str1, set<string> &res)
 {
     string results;
     stringstream input(str1);
     while(input>>results)
     {
-        res.push_back(results);
+        res.insert(results);
     }
+}
+
+unsigned long long SimSearcher::jaccard_hash(string strs)
+{
+    unsigned long long hash = 0;
+    int seed = 173;
+    int len = strs.size();
+    for (int i = 0; i < len; i++) {
+        hash = hash * seed + (int)strs[i];
+    }
+    return hash & 0x7FFFFFFF;
 }

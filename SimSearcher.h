@@ -10,6 +10,7 @@
 #include <math.h>
 #include<iostream>
 #include<sstream>
+#include<set>
 using namespace std;
 
 const int SUCCESS = 0;
@@ -24,8 +25,10 @@ public:
 	~SimSearcher();
 
 	vector<string> strs;
-    vector<vector<string> > str_tokens;
-    map<string, vector<unsigned> > inverted_list_jac;
+    vector<set<unsigned long long> > str_tokens;
+    set<string> strs_tokens;
+    set<unsigned long long> strs_hash;  
+    map<unsigned long long, vector<unsigned> > inverted_list_jac;
 	map<string, vector<unsigned> > inverted_list_ed;
 	unsigned q_num;
     unsigned s_min;
@@ -38,8 +41,10 @@ public:
     void print_jaccard_result(std::vector<std::pair<unsigned, double> > &result);
 	void print_ed_result(std::vector<std::pair<unsigned, unsigned> > &result);
     double jaccard_distance(vector<string> a, vector<string> b, unsigned same_gram);
+    double new_jaccard_distance(set<unsigned long long> a, set<unsigned long long> b);
 	unsigned lenenshtein_distance(string a, string b);
 
-    void tokenize(string str1, vector<string> &res);
+    void tokenize(string str1, set<string> &res);
+    unsigned long long jaccard_hash(string strs);
 };
 
