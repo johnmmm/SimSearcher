@@ -44,9 +44,13 @@ public:
     double jaccard_distance(vector<string> a, vector<string> b, unsigned same_gram);
     double new_jaccard_distance(set<unsigned long long> a, set<unsigned long long> b);
 	unsigned lenenshtein_distance(string a, string b);
+    unsigned new_lenenshtein_distance(string a, string b, unsigned threshold);
 
     void tokenize(string str1, set<string> &res);
     unsigned long long jaccard_hash(string strs);
     unsigned q_gram_hash(string strs);
+
+    void search_jac_scancount(int *nums, set<string> query_tokens, set<unsigned long long> &query_hash);
+    void search_ed_scancount(int *nums, string query_str);
 };
 

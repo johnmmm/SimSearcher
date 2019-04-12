@@ -75,15 +75,8 @@ int SimSearcher::searchJaccard(const char *query, double threshold, vector<pair<
 		nums[i] = 0;
 
     set<unsigned long long> query_hash;
-    set<string>::iterator it1;
-    for (it1 = query_tokens.begin(); it1 != query_tokens.end(); it1++)
-    {
-        unsigned long long tmp_long_long = jaccard_hash(*it1);
-        query_hash.insert(tmp_long_long);
-        vector<unsigned> common_gram = inverted_list_jac[tmp_long_long];
-        for (unsigned j = 0; j < common_gram.size(); j++)
-            nums[common_gram[j]]++;
-    }
+    search_jac_scancount(nums, query_tokens, query_hash);
+    
 
     // printf("least: %d\n", least_common);
     // for (int i = 0; i < ids_total; i++)
@@ -116,19 +109,14 @@ int SimSearcher::searchED(const char *query, unsigned threshold, vector<pair<uns
 	for(unsigned i = 0; i < ids_total; i++)
 		nums[i] = 0;
 
-	for (unsigned i = 0; i < query_str.size() - q_num + 1; i++)
-	{
-		string q_gram = query_str.substr(i, q_num);
-        unsigned hash_num = q_gram_hash(q_gram);
-        for (unsigned j = 0; j < inverted_list_ed_hash[hash_num].size(); j++)
-            nums[inverted_list_ed_hash[hash_num][j]]++;
-	}
-
+    search_ed_scancount(nums, query_str);
+	
 	for (unsigned i = 0; i < ids_total; i++)
 	{
 		if (nums[i] >= least_common)
 		{
-            unsigned distance = lenenshtein_distance(strs[i], query_str);
+            //unsigned distance = lenenshtein_distance(strs[i], query_str);
+            unsigned distance = new_lenenshtein_distance(strs[i], query_str, threshold);
             //printf("%d\n", distance);
             if (distance <= threshold)
             {
@@ -217,9 +205,9 @@ unsigned SimSearcher::lenenshtein_distance(string a, string b)
 	unsigned size_a = a.size();
     unsigned size_b = b.size();
     unsigned dp[2][size_b+1];
-    for (int i = 0; i <= size_b; i++)
+    for (unsigned i = 0; i <= size_b; i++)
         dp[0][i] = i;
-    for (int i = 1; i <= size_a; i++)
+    for (unsigned i = 1; i <= size_a; i++)
     {
         dp[i&1][0] = i;
         for (int j = 1; j <= size_b; j++)
@@ -231,6 +219,41 @@ unsigned SimSearcher::lenenshtein_distance(string a, string b)
         }
     }
 	return dp[size_a&1][size_b];
+}
+
+unsigned SimSearcher::new_lenenshtein_distance(string a, string b, unsigned threshold)
+{
+    int size_a = a.size();
+    int size_b = b.size();
+    int thres = (int)threshold;
+
+    if (abs(size_a - size_b) > threshold)
+        return MAXN;
+    int dp[size_a+1][size_b+1];
+
+    for (int i = 0; i <= min(thres, size_a); i++)
+    {
+        dp[i][0] = i;
+    }
+    for (int j = 0; j <= min(thres, size_b); j++)
+    {
+        dp[0][j] = j;
+    }
+    for (int i = 1; i <= size_a; i++)
+    {
+        int begin = max(i - thres, 1);
+        int end = min(i + thres, size_b);
+        if (begin > end)
+            break;
+        for (int j = begin; j <= end; j++)
+        {
+            int t = !(a[i - 1] == b[j - 1]);
+            int d1 = abs(i - 1 - j) > threshold ? MAXN : dp[i - 1][j];
+            int d2 = abs(i - j + 1) > threshold ? MAXN : dp[i][j - 1];
+            dp[i][j] = min( min(d1+1, d2+1), dp[i-1][j-1]+t );            
+        }
+    }
+    return (unsigned)dp[size_a][size_b];
 }
 
 void SimSearcher::tokenize(string str1, set<string> &res)
@@ -265,4 +288,29 @@ unsigned SimSearcher::q_gram_hash(string strs)
     if (hash_num > 2222221)
         hash_num %= 2222221;
     return hash_num;
+}
+
+void SimSearcher::search_jac_scancount(int *nums, set<string> query_tokens, set<unsigned long long> &query_hash)
+{
+    //set<unsigned long long> query_hash;
+    set<string>::iterator it1;
+    for (it1 = query_tokens.begin(); it1 != query_tokens.end(); it1++)
+    {
+        unsigned long long tmp_long_long = jaccard_hash(*it1);
+        query_hash.insert(tmp_long_long);
+        vector<unsigned> common_gram = inverted_list_jac[tmp_long_long];
+        for (unsigned j = 0; j < common_gram.size(); j++)
+            nums[common_gram[j]]++;
+    }
+}
+
+void SimSearcher::search_ed_scancount(int *nums, string query_str)
+{
+    for (unsigned i = 0; i < query_str.size() - q_num + 1; i++)
+	{
+		string q_gram = query_str.substr(i, q_num);
+        unsigned hash_num = q_gram_hash(q_gram);
+        for (unsigned j = 0; j < inverted_list_ed_hash[hash_num].size(); j++)
+            nums[inverted_list_ed_hash[hash_num][j]]++;
+	}
 }

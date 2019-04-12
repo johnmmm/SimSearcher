@@ -1,4 +1,4 @@
-CXX=g++-4.8
+CXX=g++
 CXXFLAGS=-std=c++11 -Wall -O3 -MMD -MP
 TARGET=simsearcher
 
