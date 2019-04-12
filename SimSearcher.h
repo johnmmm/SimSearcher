@@ -30,6 +30,7 @@ public:
     set<unsigned long long> strs_hash;  
     map<unsigned long long, vector<unsigned> > inverted_list_jac;
 	map<string, vector<unsigned> > inverted_list_ed;
+    
 	unsigned q_num;
     unsigned s_min;
 
@@ -46,5 +47,6 @@ public:
 
     void tokenize(string str1, set<string> &res);
     unsigned long long jaccard_hash(string strs);
+    unsigned q_gram_hash(string strs);
 };
 

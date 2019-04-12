@@ -3,6 +3,8 @@
 
 using namespace std;
 
+vector<unsigned> inverted_list_ed_hash[2222222];
+
 SimSearcher::SimSearcher()
 {
 }
@@ -30,9 +32,6 @@ int SimSearcher::createIndex(const char *filename, unsigned q)
         tokenize(tmp_str, tmp_tokens);
         set<unsigned long long> tmp_hash;
 
-        // vector<string>::iterator iter = unique(tmp_tokens.begin(), tmp_tokens.end());
-        // tmp_tokens.erase(iter, tmp_tokens.end());
-        // str_tokens.push_back(tmp_tokens);
         if (s_min > tmp_tokens.size())
             s_min = tmp_tokens.size();
         set<string>::iterator it1;
@@ -42,32 +41,20 @@ int SimSearcher::createIndex(const char *filename, unsigned q)
             tmp_hash.insert(jaccard_hash(*it1));
         }
         str_tokens.push_back(tmp_hash);
-        // for (unsigned i = 0; i < tmp_tokens.size(); i++)
-        // {
-        //     inverted_list_jac[tmp_tokens[i]].push_back(tmp_num);
-        // }
 
         //ed:
-		for (unsigned i = 0; i < n - q + 1; i++)
-		{
-			string q_gram = tmp_str.substr(i, q);
-			inverted_list_ed[q_gram].push_back(tmp_num);
-		}
+        set<unsigned> q_gram_set;
+        for (unsigned i = 0; i < n - q + 1; i++)
+        {
+            string q_gram = tmp_str.substr(i, q);
+            q_gram_set.insert(q_gram_hash(q_gram));
+        }
+        set<unsigned>::iterator it2;
+        for (it2 = q_gram_set.begin(); it2 != q_gram_set.end(); it2++)
+        {
+            inverted_list_ed_hash[*it2].push_back(tmp_num);
+        }
 		tmp_num++;
-	}
-
-    // map<string, vector<unsigned> >::iterator it1;
-	// for (it1 = inverted_list_jac.begin(); it1 != inverted_list_jac.end(); it1++)
-	// {
-	// 	vector<unsigned>::iterator iter = unique(it1->second.begin(), it1->second.end());
-	// 	it1->second.erase(iter, it1->second.end());
-	// }
-
-	map<string, vector<unsigned> >::iterator it2;
-	for (it2 = inverted_list_ed.begin(); it2 != inverted_list_ed.end(); it2++)
-	{
-		vector<unsigned>::iterator iter = unique(it2->second.begin(), it2->second.end());
-		it2->second.erase(iter, it2->second.end());
 	}
 
 	return SUCCESS;
@@ -80,8 +67,6 @@ int SimSearcher::searchJaccard(const char *query, double threshold, vector<pair<
     set<string> query_tokens;
     tokenize(query_str, query_tokens);
 
-    // vector<string>::iterator iter = unique(query_tokens.begin(), query_tokens.end());
-    // query_tokens.erase(iter, query_tokens.end());
     unsigned str_size = query_tokens.size();
     int least_common = (int)ceil( max(threshold*str_size, (str_size+s_min)*threshold/(1.0+threshold) ) );
     unsigned ids_total = strs.size();
@@ -100,25 +85,6 @@ int SimSearcher::searchJaccard(const char *query, double threshold, vector<pair<
             nums[common_gram[j]]++;
     }
 
-    //这里搞遍历
-	// map<string, vector<unsigned> > common_gram;
-    // for (unsigned i = 0; i < query_tokens.size(); i++)
-	// {
-	// 	string q_gram = query_tokens[i];
-	// 	//common_gram[q_gram] = inverted_list_jac[q_gram];
-    //     vector<unsigned> common_gram = inverted_list_jac[q_gram];
-    //     for (unsigned j = 0; j < common_gram.size(); j++)
-    //         nums[common_gram[j]]++;
-	// }
-    
-	// map<string, vector<unsigned> >::iterator it;
-	// for (it = common_gram.begin(); it != common_gram.end(); it++)
-	// {
-	// 	for (unsigned i = 0; i < it->second.size(); i++)
-	// 	{
-	// 		nums[it->second[i]]++;
-	// 	}
-	// }
     // printf("least: %d\n", least_common);
     // for (int i = 0; i < ids_total; i++)
     // {
@@ -153,10 +119,9 @@ int SimSearcher::searchED(const char *query, unsigned threshold, vector<pair<uns
 	for (unsigned i = 0; i < query_str.size() - q_num + 1; i++)
 	{
 		string q_gram = query_str.substr(i, q_num);
-		//common_gram[q_gram] = inverted_list_ed[q_gram];
-        vector<unsigned> common_gram = inverted_list_ed[q_gram];
-        for (unsigned j = 0; j < common_gram.size(); j++)
-            nums[common_gram[j]]++;
+        unsigned hash_num = q_gram_hash(q_gram);
+        for (unsigned j = 0; j < inverted_list_ed_hash[hash_num].size(); j++)
+            nums[inverted_list_ed_hash[hash_num][j]]++;
 	}
 
 	for (unsigned i = 0; i < ids_total; i++)
@@ -194,18 +159,18 @@ void SimSearcher::print_inverted_list()
 	// 	printf("\n");
 	// }
 
-    printf("inverted list ed:\n");
-    map<string, vector<unsigned> >::iterator it;
-	for (it = inverted_list_ed.begin(); it != inverted_list_ed.end(); it++)
-	{
-		printf("%s: ", (it->first).c_str());
-		unsigned size = it->second.size();
-		for (unsigned i = 0; i < size; i++)
-		{
-			printf("%d ", (it->second)[i]);
-		}
-		printf("\n");
-	}
+    // printf("inverted list ed:\n");
+    // map<string, vector<unsigned> >::iterator it;
+	// for (it = inverted_list_ed.begin(); it != inverted_list_ed.end(); it++)
+	// {
+	// 	printf("%s: ", (it->first).c_str());
+	// 	unsigned size = it->second.size();
+	// 	for (unsigned i = 0; i < size; i++)
+	// 	{
+	// 		printf("%d ", (it->second)[i]);
+	// 	}
+	// 	printf("\n");
+	// }
 }
 
 void SimSearcher::print_jaccard_result(std::vector<std::pair<unsigned, double> > &result)
@@ -280,11 +245,24 @@ void SimSearcher::tokenize(string str1, set<string> &res)
 
 unsigned long long SimSearcher::jaccard_hash(string strs)
 {
-    unsigned long long hash = 0;
+    unsigned long long hash_num = 0;
     int seed = 173;
     int len = strs.size();
     for (int i = 0; i < len; i++) {
-        hash = hash * seed + (int)strs[i];
+        hash_num = hash_num * seed + (int)strs[i];
     }
-    return hash & 0x7FFFFFFF;
+    return hash_num & 0x7FFFFFFF;
+}
+
+unsigned SimSearcher::q_gram_hash(string strs)
+{
+    unsigned seed = 129;
+    unsigned hash_num = 0;
+    int len = strs.size();
+    for (int i = 0; i < len; i++) {
+        hash_num = hash_num * seed + (int)strs[i];
+    }
+    if (hash_num > 2222221)
+        hash_num %= 2222221;
+    return hash_num;
 }
