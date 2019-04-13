@@ -77,7 +77,8 @@ int SimSearcher::searchED(const char *query, unsigned threshold, vector<pair<uns
 	result.clear();
 	string query_str = query;
 	
-    search_ed_scancount(query_str, threshold, result);
+    //search_ed_scancount(query_str, threshold, result);
+    search_ed_mergeopt(query_str, threshold, result);
 	
 	return SUCCESS;
 }
@@ -261,29 +262,305 @@ void SimSearcher::search_ed_scancount(string query_str, unsigned threshold, vect
 {
     int least_common = query_str.size() - q_num + 1 - threshold * q_num;
     unsigned ids_total = strs.size();
-	int nums[ids_total];
-	for(unsigned i = 0; i < ids_total; i++)
-		nums[i] = 0;
-    
-    for (unsigned i = 0; i < query_str.size() - q_num + 1; i++)
-	{
-		string q_gram = query_str.substr(i, q_num);
-        unsigned hash_num = q_gram_hash(q_gram);
-        for (unsigned j = 0; j < inverted_list_ed_hash[hash_num].size(); j++)
-            nums[inverted_list_ed_hash[hash_num][j]]++;
-	}
 
-    for (unsigned i = 0; i < ids_total; i++)
-	{
-		if (nums[i] >= least_common)
-		{
-            //unsigned distance = lenenshtein_distance(strs[i], query_str);
+    if (least_common > 0)
+    {
+        int nums[ids_total];
+        for(unsigned i = 0; i < ids_total; i++)
+            nums[i] = 0;
+        
+        for (unsigned i = 0; i < query_str.size() - q_num + 1; i++)
+        {
+            string q_gram = query_str.substr(i, q_num);
+            unsigned hash_num = q_gram_hash(q_gram);
+            for (unsigned j = 0; j < inverted_list_ed_hash[hash_num].size(); j++)
+                nums[inverted_list_ed_hash[hash_num][j]]++;
+        }
+
+        for (unsigned i = 0; i < ids_total; i++)
+        {
+            if (nums[i] >= least_common)
+            {
+                //unsigned distance = lenenshtein_distance(strs[i], query_str);
+                unsigned distance = new_lenenshtein_distance(strs[i], query_str, threshold);
+                //printf("%d\n", distance);
+                if (distance <= threshold)
+                {
+                    result.push_back(make_pair(i, distance));
+                }
+            }
+        }
+    }
+
+    else
+    {
+        for (unsigned i = 0; i < ids_total; i++)
+        {
             unsigned distance = new_lenenshtein_distance(strs[i], query_str, threshold);
             //printf("%d\n", distance);
             if (distance <= threshold)
             {
                 result.push_back(make_pair(i, distance));
             }
-		}
-	}
+        }
+    }
+    
+	
+}
+
+void SimSearcher::search_ed_mergeopt(string query_str, unsigned threshold, vector<pair<unsigned, unsigned> > &result)
+{
+    int least_common = query_str.size() - q_num + 1 - threshold * q_num;
+    unsigned ids_total = strs.size();
+    vector<unsigned> selected_str;
+    vector<vector<unsigned> > waiting_list;
+    //printf("least_common: %d\n", least_common);
+
+    if (least_common > 0)
+    {
+        for (unsigned i = 0; i < query_str.size() - q_num + 1; i++)
+        {
+            string q_gram = query_str.substr(i, q_num);
+            unsigned hash_num = q_gram_hash(q_gram);
+            vector<unsigned> selected_list = inverted_list_ed_hash[hash_num];
+            if (selected_list.size() > 0)
+                waiting_list.push_back(selected_list);
+
+            // for (unsigned j = 0; j < inverted_list_ed_hash[hash_num].size(); j++)
+            //     nums[inverted_list_ed_hash[hash_num][j]]++;
+        }
+
+        // printf("begin!\n");
+        mergeopt(waiting_list, selected_str, least_common);
+
+        // printf("size: %lu\n", selected_str.size());
+        // for (int i = 0; i < selected_str.size(); i++)
+        // {
+        //     printf("%d, ", selected_str[i]);
+        // }
+        // printf("\n");
+
+        for (int i = 0; i < selected_str.size(); i++)
+        {
+            unsigned distance = new_lenenshtein_distance(strs[selected_str[i]], query_str, threshold);
+            //printf("%d\n", distance);
+            if (distance <= threshold)
+            {
+                result.push_back(make_pair(selected_str[i], distance));
+            }
+        }
+    }
+
+    else
+    {
+        for (unsigned i = 0; i < ids_total; i++)
+        {
+            unsigned distance = new_lenenshtein_distance(strs[i], query_str, threshold);
+            //printf("%d\n", distance);
+            if (distance <= threshold)
+            {
+                result.push_back(make_pair(i, distance));
+            }
+        }
+    }
+    
+    
+}
+
+void SimSearcher::mergeopt(vector<vector<unsigned> > &waiting_list, vector<unsigned> &selected_str, int count_thres)
+{
+    // for (int i = 0; i < waiting_list.size(); i++)
+    // {
+    //     printf("%d: ", i);
+    //     for (int j = 0; j < waiting_list[i].size(); j++)
+    //     {
+    //         printf("%d, ", waiting_list[i][j]);
+    //     }
+    //     printf("\n");
+    // }
+    
+    //在这里对已经排好序的列表们进行筛选，得到一个可行的列表
+    unsigned waiting_size = waiting_list.size();
+    unsigned ids_total = strs.size();
+    //unsigned ids_total = 16;
+    unsigned count_place = 0;//已经取得的最小值，当其为ids那么多的时候就结束了
+    //重复至没有要搜的
+
+    //维护这些变量，重复使用
+    vector<unsigned> need_to_search;//表示这些waiting_list需要搜一遍
+    for (unsigned i = 0; i < waiting_size; i++)
+        need_to_search.push_back(i);
+    int occur_num[ids_total]; //选出来的那些数值的数量
+    unsigned waiting_place[waiting_size];//当前计算到哪一个了，到顶就炸
+    vector<unsigned> num_to_list[ids_total];//记录那些被选中的数值来自哪些链
+    memset(occur_num, 0, sizeof(unsigned)*ids_total);
+    memset(waiting_place, 0, sizeof(unsigned)*waiting_size);
+    set<unsigned> occur_str; //选出来的那些数值，按大小排好了已经
+
+    while (need_to_search.size() != 0)
+    {
+        //debug:
+        // printf("count_place: %d\n", count_place);
+        
+
+        // printf("occur_num: ");
+        // for (int i = 0; i < ids_total; i++)
+        // {
+        //     printf("%d, ", occur_num[i]);
+        // }
+        // printf("\n");
+
+        // printf("waiting_place: ");
+        // for (int i = 0; i < waiting_size; i++)
+        // {
+        //     printf("%d, ", waiting_place[i]);
+        // }
+        // printf("\n");
+        
+        //更新搜索
+        for (unsigned i = 0; i < need_to_search.size(); i++)
+        {
+            unsigned place = need_to_search[i];
+            if (waiting_place[place] < waiting_list[place].size())
+            {
+                unsigned tmp_str_num = waiting_list[place][waiting_place[place]];
+                occur_str.insert(tmp_str_num);
+                occur_num[tmp_str_num]++;
+                num_to_list[tmp_str_num].push_back(place);
+            }
+        }
+        need_to_search.clear();
+
+        //开始筛选，前进
+        int already_delete = 0; //occur_num[choice_one] >= count_thres - already_delete
+        set<unsigned>::iterator it1;
+        it1 = occur_str.begin();
+        while (it1 != occur_str.end())
+        {
+            if (occur_num[*it1] < count_thres - already_delete)//这个不行
+            {
+                already_delete += occur_num[*it1];
+                count_place = *it1 + 1;
+                //回溯这边的位置
+                for (unsigned j = 0; j < num_to_list[*it1].size(); j++)
+                {
+                    waiting_place[num_to_list[*it1][j]]++;
+                    need_to_search.push_back(num_to_list[*it1][j]);
+                }   
+                it1++;
+                occur_str.erase(occur_str.begin()); 
+            }
+            else if (occur_num[*it1] >= count_thres)//直接爆掉
+            {
+                selected_str.push_back(*it1);
+                for (unsigned j = 0; j < num_to_list[*it1].size(); j++)
+                {
+                    waiting_place[num_to_list[*it1][j]]++;
+                    need_to_search.push_back(num_to_list[*it1][j]);
+                }  
+                count_place = *it1 + 1;
+                occur_str.erase(occur_str.begin()); 
+                break;
+            }
+            else    //  左边的便都没有意义了
+            {
+                count_place = *it1;
+                break;
+            }
+                
+        }
+
+        // printf("num_to_list: \n");
+        // for (unsigned i = 0; i < ids_total; i++)
+        // {
+        //     printf("%d:  ", i);
+        //     for (unsigned j = 0; j < num_to_list[i].size(); j++)
+        //     {
+        //         printf("%d, ", num_to_list[i][j]);
+        //     }
+        //     printf("\n");
+        // }
+
+        // printf("need to search: ");
+        // for (unsigned i = 0; i < need_to_search.size(); i++)
+        // {
+        //     printf("%d, ", need_to_search[i]);
+        // }
+        // printf("\n");
+
+
+
+        //寻找对应点在每个表中的位置
+        for (unsigned i = 0; i < need_to_search.size(); i++)
+        {
+            unsigned place = need_to_search[i];
+            waiting_place[place] = bi_search(waiting_list[place], count_place, waiting_place[place]);
+        }
+        //这轮就算完了应该
+    }
+    
+}
+
+//寻找合适的出来的点，如果没有就返回前面一个
+unsigned SimSearcher::bi_search(vector<unsigned> &one_list, unsigned one_place, unsigned start_place)
+{
+    unsigned left = start_place;
+    unsigned right = one_list.size();
+
+    while (left + 1 < right)
+    {
+        unsigned next = (left + right) / 2;
+        if (one_list[next] <= one_place)
+            left = next;
+        else
+            right = next;
+    }
+    if (one_list[left] < one_place)
+        return right;
+    else
+        return left;
+}
+
+void SimSearcher::mergeopt_cell_test()
+{
+    vector<vector<unsigned> > waiting_list;
+    vector<unsigned> vector1;
+    vector<unsigned> vector2;
+    vector<unsigned> vector3;
+    vector<unsigned> vector4;
+    vector<unsigned> vector5;
+
+    vector1.push_back(1);
+    vector1.push_back(3);
+    vector1.push_back(5);
+    vector1.push_back(10);
+    vector1.push_back(13);
+
+    vector2.push_back(10);
+    vector2.push_back(13);
+    vector2.push_back(15);
+
+    vector3.push_back(5);
+    vector3.push_back(7);
+    vector3.push_back(13);
+
+    vector4.push_back(13);
+
+    vector5.push_back(15);
+
+    waiting_list.push_back(vector1);
+    waiting_list.push_back(vector2);
+    waiting_list.push_back(vector3);
+    waiting_list.push_back(vector4);
+    waiting_list.push_back(vector5);
+
+    vector<unsigned> selected_str;
+
+    mergeopt(waiting_list, selected_str, 4);
+
+    for (int i = 0; i < selected_str.size(); i++)
+    {
+        printf("%d, ", selected_str[i]);
+    }
+    printf("\n");
 }
