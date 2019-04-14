@@ -17,6 +17,8 @@ const int SUCCESS = 0;
 const int FAILURE = 1;
 const int MAXN = 66666666;
 const double eps = 1e-8;
+const int ed_hash = 2222222;
+const int jac_hash = 76666666;
 
 class SimSearcher
 {
@@ -46,12 +48,13 @@ public:
 	unsigned lenenshtein_distance(string a, string b);
     unsigned new_lenenshtein_distance(string a, string b, unsigned threshold);
 
-    void tokenize(string str1, set<string> &res);
+    void tokenize(string str1, vector<string> &res);
     unsigned long long jaccard_hash(string strs);
+    unsigned new_jaccard_hash(string strs);
     unsigned q_gram_hash(string strs);
 
     void search_jac_scancount(set<string> query_tokens, double threshold, vector<pair<unsigned, double> > &result);
-    void search_jac_divideskip(set<string> &query_tokens, double threshold, vector<pair<unsigned, double> > &result);
+    void search_jac_divideskip(vector<string> &query_tokens, double threshold, vector<pair<unsigned, double> > &result);
     void search_ed_scancount(string query_str, unsigned threshold, vector<pair<unsigned, unsigned> > &result);
     void search_ed_mergeopt(string query_str, unsigned threshold, vector<pair<unsigned, unsigned> > &result);
     void search_ed_divideskip(string query_str, unsigned threshold, vector<pair<unsigned, unsigned> > &result);

@@ -3,7 +3,9 @@
 
 using namespace std;
 
-vector<unsigned>* inverted_list_ed_hash[2222222];
+vector<unsigned>* inverted_list_ed_hash[ed_hash];
+vector<unsigned>* inverted_list_jac_hash[jac_hash];
+unsigned jac_is_dup[jac_hash];
 
 bool cmp2(pair<vector<unsigned>*, unsigned>a, pair<vector<unsigned>*, unsigned>b) //降序排序
 {
@@ -54,8 +56,10 @@ SimSearcher::~SimSearcher()
 }
 
 int SimSearcher::createIndex(const char *filename, unsigned q)
-{
-	q_num = q;
+{    
+    memset(jac_is_dup, 0, sizeof(int)*jac_hash);
+    
+    q_num = q;
     s_min = (unsigned)MAXN;
 	char buf[1024];
 	unsigned tmp_num = 0;
@@ -68,43 +72,50 @@ int SimSearcher::createIndex(const char *filename, unsigned q)
 		strs.push_back(tmp_str);
 
         //jac:
-        set<string> tmp_tokens;
+        vector<string> tmp_tokens;
         tokenize(tmp_str, tmp_tokens);
         set<unsigned long long> tmp_hash;
 
         if (s_min > tmp_tokens.size())
             s_min = tmp_tokens.size();
-        set<string>::iterator it1;
-        for (it1 = tmp_tokens.begin(); it1 != tmp_tokens.end(); it1++)
+        for (int i = 0; i < tmp_tokens.size(); i++)
         {
-            if (inverted_list_jac[jaccard_hash(*it1)] == NULL)
+            unsigned new_hash_num = new_jaccard_hash(tmp_tokens[i]);
+
+            if (inverted_list_jac_hash[new_hash_num] == NULL)
             {
-                inverted_list_jac[jaccard_hash(*it1)] = new vector<unsigned>;
-                inverted_list_jac[jaccard_hash(*it1)]->push_back(tmp_num);
+                inverted_list_jac_hash[new_hash_num] = new vector<unsigned>;
+                inverted_list_jac_hash[new_hash_num]->push_back(tmp_num);
             }
             else
-                inverted_list_jac[jaccard_hash(*it1)]->push_back(tmp_num);
-            tmp_hash.insert(jaccard_hash(*it1));
+            {
+                if (inverted_list_jac_hash[new_hash_num]->back() != tmp_num)
+                    inverted_list_jac_hash[new_hash_num]->push_back(tmp_num);
+                //替代set完成去重
+            }
+            tmp_hash.insert(new_hash_num);
         }
         str_tokens.push_back(tmp_hash);
 
         //ed:
-        set<unsigned> q_gram_set;
+        vector<unsigned> q_gram_vec;
         for (unsigned i = 0; i < n - q + 1; i++)
         {
             string q_gram = tmp_str.substr(i, q);
-            q_gram_set.insert(q_gram_hash(q_gram));
+            q_gram_vec.push_back(q_gram_hash(q_gram));
         }
-        set<unsigned>::iterator it2;
-        for (it2 = q_gram_set.begin(); it2 != q_gram_set.end(); it2++)
+        for (int i = 0; i < q_gram_vec.size(); i++)
         {
-            if (inverted_list_ed_hash[*it2] == NULL)
+            if (inverted_list_ed_hash[q_gram_vec[i]] == NULL)
             {
-                inverted_list_ed_hash[*it2] = new vector<unsigned>;
-                inverted_list_ed_hash[*it2]->push_back(tmp_num);
+                inverted_list_ed_hash[q_gram_vec[i]] = new vector<unsigned>;
+                inverted_list_ed_hash[q_gram_vec[i]]->push_back(tmp_num);
             }
             else
-                inverted_list_ed_hash[*it2]->push_back(tmp_num);
+            {
+                if (inverted_list_ed_hash[q_gram_vec[i]]->back() != tmp_num)
+                    inverted_list_ed_hash[q_gram_vec[i]]->push_back(tmp_num);
+            }   
         }
 		tmp_num++;
 	}
@@ -116,7 +127,7 @@ int SimSearcher::searchJaccard(const char *query, double threshold, vector<pair<
 {
 	result.clear();
     string query_str = query;
-    set<string> query_tokens;
+    vector<string> query_tokens;
     tokenize(query_str, query_tokens);
 
     //search_jac_scancount(query_tokens, threshold, result);
@@ -243,14 +254,37 @@ unsigned SimSearcher::new_lenenshtein_distance(string a, string b, unsigned thre
     return (unsigned)dp[size_a][size_b];
 }
 
-void SimSearcher::tokenize(string str1, set<string> &res)
+void SimSearcher::tokenize(string str1, vector<string> &res)
 {
+    //memset(jac_is_dup, 0, sizeof(int)*jac_hash);
     string results;
     stringstream input(str1);
+    vector<unsigned> changed_num;
     while(input>>results)
     {
-        res.insert(results);
+        unsigned new_hash = new_jaccard_hash(results);
+        if (jac_is_dup[new_hash] == 0)
+        {
+            jac_is_dup[new_hash]++;
+            changed_num.push_back(new_hash);
+            res.push_back(results);
+        }
     }
+    for (int i = 0; i < changed_num.size(); i++)
+    {
+        jac_is_dup[changed_num[i]] = 0;
+    }
+    //这个地方有一个去重的问题，所以之前用了set，可以更改jachash来解决这个问题
+
+
+    // int place = 0;
+    // for (int i = 0; i < str1.size(); i++)
+    // {
+    //     if (str1[i] == ' ')
+    //     {
+    //         res.push_back(str1.substr(place, i-place));
+    //     }
+    // }
 }
 
 unsigned long long SimSearcher::jaccard_hash(string strs)
@@ -262,6 +296,17 @@ unsigned long long SimSearcher::jaccard_hash(string strs)
         hash_num = hash_num * seed + (int)strs[i];
     }
     return hash_num & 0x7FFFFFFF;
+}
+
+unsigned SimSearcher::new_jaccard_hash(string strs)
+{
+    unsigned long long hash_num = 0;
+    int seed = 173;
+    int len = strs.size();
+    for (int i = 0; i < len; i++) {
+        hash_num = hash_num * seed + (int)strs[i];
+    }
+    return hash_num & 0x3FFFFFF;
 }
 
 unsigned SimSearcher::q_gram_hash(string strs)
@@ -290,9 +335,9 @@ void SimSearcher::search_jac_scancount(set<string> query_tokens, double threshol
     set<string>::iterator it1;
     for (it1 = query_tokens.begin(); it1 != query_tokens.end(); it1++)
     {
-        unsigned long long tmp_long_long = jaccard_hash(*it1);
+        unsigned long long tmp_long_long = new_jaccard_hash(*it1);
         query_hash.insert(tmp_long_long);
-        vector<unsigned>* common_gram = inverted_list_jac[tmp_long_long];
+        vector<unsigned>* common_gram = inverted_list_jac_hash[tmp_long_long];
         for (unsigned j = 0; j < (*common_gram).size(); j++)
             nums[(*common_gram)[j]]++;
     }
@@ -312,7 +357,7 @@ void SimSearcher::search_jac_scancount(set<string> query_tokens, double threshol
 	}
 }
 
-void SimSearcher::search_jac_divideskip(set<string> &query_tokens, double threshold, vector<pair<unsigned, double> > &result)
+void SimSearcher::search_jac_divideskip(vector<string> &query_tokens, double threshold, vector<pair<unsigned, double> > &result)
 {
     unsigned str_size = query_tokens.size();
     int least_common = (int)ceil( max(threshold*str_size, (str_size+s_min)*threshold/(1.0+threshold) ) );
@@ -324,11 +369,11 @@ void SimSearcher::search_jac_divideskip(set<string> &query_tokens, double thresh
     vector<pair<vector<unsigned>*, unsigned> > skip_list;
 
     set<string>::iterator it1;
-    for (it1 = query_tokens.begin(); it1 != query_tokens.end(); it1++)
+    for (int i = 0; i < query_tokens.size(); i++)
     {
-        unsigned long long tmp_long_long = jaccard_hash(*it1);
+        unsigned long long tmp_long_long = new_jaccard_hash(query_tokens[i]);
         query_hash.insert(tmp_long_long);
-        vector<unsigned>* selected_list = inverted_list_jac[tmp_long_long];
+        vector<unsigned>* selected_list = inverted_list_jac_hash[tmp_long_long];
         if (selected_list != NULL)
         {
             skip_list.push_back(make_pair(selected_list, (*selected_list).size()));
