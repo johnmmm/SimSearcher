@@ -137,11 +137,10 @@ double SimSearcher::new_jaccard_distance(set<unsigned long long> a, set<unsigned
     unsigned size_a = a.size();
     unsigned size_b = b.size();
     int cnt = 0;
-    for (auto w : a)
-    {
-        if (b.find(w) != b.end())
-            cnt++;
-    }
+    set<unsigned> insection_result;
+    set_intersection(a.begin(), a.end(), 
+                    b.begin(), b.end(), 
+                    inserter(insection_result, insection_result.begin()));
     return ((double)cnt / (double)(size_a + size_b - cnt));
 }
 
@@ -567,6 +566,13 @@ void SimSearcher::mergeopt(vector<vector<unsigned>* > &waiting_list, vector<unsi
 
 void SimSearcher::divideskip(vector<pair<vector<unsigned>*, unsigned> > &skip_list, vector<unsigned> &selected_str, int count_thres)
 {
+    unsigned count_thres_plus;
+    if (count_thres == 1)
+        count_thres_plus = 1;
+    else if (count_thres <= 4)
+        count_thres_plus = 2;
+    else 
+        count_thres_plus = 4;
     unsigned ids_total = strs.size();
     int nums[ids_total];
     memset(nums, 0, sizeof(int)*ids_total);
@@ -576,16 +582,22 @@ void SimSearcher::divideskip(vector<pair<vector<unsigned>*, unsigned> > &skip_li
 
     //printf("scancount:\n");
     //scancount
-    for (int i = count_thres - 1; i < skip_list.size(); i++)
+    for (int i = count_thres - count_thres_plus; i < skip_list.size(); i++)
     {
         vector<unsigned>* tmp_pointer = skip_list[i].first;
         for (unsigned j = 0; j < (*tmp_pointer).size(); j++)
         {
             nums[(*tmp_pointer)[j]]++;
-            if (nums[(*tmp_pointer)[j]] == 1)
-                avail_str.push_back((*tmp_pointer)[j]);
+            if (nums[(*tmp_pointer)[j]] == count_thres_plus)
+            {
+                selected_str.push_back((*tmp_pointer)[j]);
+                //avail_str.push_back((*tmp_pointer)[j]);
+            }
+                
         }      
     }
+    sort(selected_str.begin(), selected_str.end());
+    return;
     sort(avail_str.begin(), avail_str.end());
 
     //printf("bi look up:\n");
@@ -605,7 +617,7 @@ void SimSearcher::divideskip(vector<pair<vector<unsigned>*, unsigned> > &skip_li
         //     printf("%d, ", nums[i]);
         // printf("\n");
                     
-        for (int j = 0; j < count_thres - 1; j++)
+        for (int j = count_thres - count_thres_plus - 1; j >= 0; j--)
         {
             unsigned new_place = bi_search(*(skip_list[j].first), avail_str[i], search_place[j]);
             if ((*skip_list[j].first)[new_place] == avail_str[i])
@@ -635,7 +647,7 @@ unsigned SimSearcher::bi_search(vector<unsigned> &one_list, unsigned one_place, 
 
     while (left + 1 < right)
     {
-        unsigned next = (left + right) / 2;
+        unsigned next = (left + right) >> 1;
         if (one_list[next] <= one_place)
             left = next;
         else
