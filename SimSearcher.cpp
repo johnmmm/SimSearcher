@@ -15,6 +15,36 @@ bool cmp3(pair<set<unsigned>*, unsigned>a, pair<set<unsigned>*, unsigned>b) //é™
     return a.second > b.second;
 }
 
+template<typename UINT>
+int levenshtein_bit_vector(string a, int m, string b, int n)
+{    
+    int r = m;
+    UINT vp = (UINT)-1;
+    UINT vn = 0;
+    UINT hp = 0;
+    UINT hn = 0;
+    int bl = min<int>(n, sizeof(UINT) * 8);
+    for (int j = 0; j < m; j++) {
+        UINT pm = 0;
+        for (int i = bl-1; i >= 0; i--) {
+            pm <<= 1;
+            pm |= b[i] == a[j];
+        }
+        UINT d = (((pm & vp) + vp)) ^ vp | pm | vn;
+        hp = (vn | ~(d | vp));
+        UINT hpw = (hp << 1) | 1;
+        hn = d & vp;
+        vp = (hn << 1) | ~(d | hpw);
+        vn = d & hpw;
+    }
+    for (int i = 0; i < bl; i++) {
+        r += (vp & 1) - (vn & 1);
+        vp >>= 1;
+        vn >>= 1;
+    }
+    return r;
+}
+
 SimSearcher::SimSearcher()
 {
 }
@@ -458,7 +488,18 @@ void SimSearcher::search_ed_divideskip(string query_str, unsigned threshold, vec
         for (int i = 0; i < selected_str.size(); i++)
         {
             unsigned distance = new_lenenshtein_distance(strs[selected_str[i]], query_str, threshold);
-            //printf("%d\n", distance);
+            // // const char *a = strs[selected_str[i]].c_str();
+            // // const char *b = query_str.c_str();
+            // unsigned distance;
+            // int m = strs[selected_str[i]].size(), n = query_str.size();
+            // // if (m < n)
+            // //     swap(a, b), swap(m, n);
+            // if (n <= 64)
+            //     distance = levenshtein_bit_vector<uint64_t>(strs[selected_str[i]], m, query_str, n);
+            // else if (n <= 128)
+            //     distance = levenshtein_bit_vector<unsigned __int128>(strs[selected_str[i]], m, query_str, n);
+            // else
+            //     distance = new_lenenshtein_distance(strs[selected_str[i]], query_str, threshold);
             if (distance <= threshold)
             {
                 result.push_back(make_pair(selected_str[i], distance));
@@ -471,6 +512,19 @@ void SimSearcher::search_ed_divideskip(string query_str, unsigned threshold, vec
         for (unsigned i = 0; i < ids_total; i++)
         {
             unsigned distance = new_lenenshtein_distance(strs[i], query_str, threshold);
+            // // const char *a = strs[i].c_str();
+            // // const char *b = query_str.c_str();
+            // unsigned distance;
+            // //int m = (int)strlen(a), n = (int)strlen(b);
+            // int m = strs[i].size(), n = query_str.size();
+            // // if (m < n)
+            // //     swap(a, b), swap(m, n);
+            // if (n <= 64)
+            //     distance = levenshtein_bit_vector<uint64_t>(strs[i], m, query_str, n);
+            // else if (n <= 128)
+            //     distance = levenshtein_bit_vector<unsigned __int128>(strs[i], m, query_str, n);
+            // else
+            //     distance = new_lenenshtein_distance(strs[i], query_str, threshold);
             //printf("%d\n", distance);
             if (distance <= threshold)
             {
@@ -654,8 +708,13 @@ void SimSearcher::divideskip_jac(vector<pair<vector<unsigned>*, unsigned> > &ski
     {
         if (nums[avail_str[i]] >= count_thres)
         {
-            selected_str.push_back(avail_str[i]);
-            continue;
+            if (is_push[avail_str[i]] == 0)
+            {
+                selected_str.push_back(avail_str[i]);
+                is_push[avail_str[i]] = 1;
+            }
+            // selected_str.push_back(avail_str[i]);
+            // continue;
         }
                     
         for (int j = count_thres - count_thres_plus - 1; j >= 0; j--)
