@@ -5,6 +5,11 @@ using namespace std;
 
 vector<unsigned>* inverted_list_ed_hash[2222222];
 
+bool cmp2(pair<vector<unsigned>*, unsigned>a, pair<vector<unsigned>*, unsigned>b) //降序排序
+{
+    return a.second > b.second;
+}
+
 SimSearcher::SimSearcher()
 {
 }
@@ -83,8 +88,9 @@ int SimSearcher::searchED(const char *query, unsigned threshold, vector<pair<uns
 	result.clear();
 	string query_str = query;
 	
-    search_ed_scancount(query_str, threshold, result);
+    //search_ed_scancount(query_str, threshold, result);
     //search_ed_mergeopt(query_str, threshold, result);
+    search_ed_divideskip(query_str, threshold, result);
 	
 	return SUCCESS;
 }
@@ -336,9 +342,6 @@ void SimSearcher::search_ed_mergeopt(string query_str, unsigned threshold, vecto
             vector<unsigned>* selected_list = inverted_list_ed_hash[hash_num];
             if (selected_list != NULL)
                 waiting_list.push_back(selected_list);
-
-            // for (unsigned j = 0; j < inverted_list_ed_hash[hash_num].size(); j++)
-            //     nums[inverted_list_ed_hash[hash_num][j]]++;
         }
 
         //printf("begin!\n");
@@ -375,6 +378,56 @@ void SimSearcher::search_ed_mergeopt(string query_str, unsigned threshold, vecto
         }
     }
     
+}
+
+void SimSearcher::search_ed_divideskip(string query_str, unsigned threshold, vector<pair<unsigned, unsigned> > &result)
+{
+    int least_common = query_str.size() - q_num + 1 - threshold * q_num;
+    unsigned ids_total = strs.size();
+    vector<unsigned> selected_str;
+    vector<pair<vector<unsigned>*, unsigned> > skip_list;
+
+    if (least_common > 0)
+    {
+        for (unsigned i = 0; i < query_str.size() - q_num + 1; i++)
+        {
+            string q_gram = query_str.substr(i, q_num);
+            unsigned hash_num = q_gram_hash(q_gram);
+            vector<unsigned>* selected_list = inverted_list_ed_hash[hash_num];
+            if (selected_list != NULL)
+            {
+                skip_list.push_back(make_pair(selected_list, (*selected_list).size()));
+            }
+        }
+
+        //printf("begin:\n");
+        sort(skip_list.begin(), skip_list.end(), cmp2);
+        //printf("divide:\n");
+        divideskip(skip_list, selected_str, least_common);
+
+        for (int i = 0; i < selected_str.size(); i++)
+        {
+            unsigned distance = new_lenenshtein_distance(strs[selected_str[i]], query_str, threshold);
+            //printf("%d\n", distance);
+            if (distance <= threshold)
+            {
+                result.push_back(make_pair(selected_str[i], distance));
+            }
+        }
+    }
+
+    else
+    {
+        for (unsigned i = 0; i < ids_total; i++)
+        {
+            unsigned distance = new_lenenshtein_distance(strs[i], query_str, threshold);
+            //printf("%d\n", distance);
+            if (distance <= threshold)
+            {
+                result.push_back(make_pair(i, distance));
+            }
+        }
+    }
     
 }
 
@@ -510,6 +563,68 @@ void SimSearcher::mergeopt(vector<vector<unsigned>* > &waiting_list, vector<unsi
         //这轮就算完了应该
     }
     
+}
+
+void SimSearcher::divideskip(vector<pair<vector<unsigned>*, unsigned> > &skip_list, vector<unsigned> &selected_str, int count_thres)
+{
+    unsigned ids_total = strs.size();
+    int nums[ids_total];
+    memset(nums, 0, sizeof(int)*ids_total);
+    int search_place[count_thres-1];
+    memset(search_place, 0, sizeof(int)*(count_thres-1));
+    vector<unsigned> avail_str;
+
+    //printf("scancount:\n");
+    //scancount
+    for (int i = count_thres - 1; i < skip_list.size(); i++)
+    {
+        vector<unsigned>* tmp_pointer = skip_list[i].first;
+        for (unsigned j = 0; j < (*tmp_pointer).size(); j++)
+        {
+            nums[(*tmp_pointer)[j]]++;
+            if (nums[(*tmp_pointer)[j]] == 1)
+                avail_str.push_back((*tmp_pointer)[j]);
+        }      
+    }
+    sort(avail_str.begin(), avail_str.end());
+
+    //printf("bi look up:\n");
+    //bi look up
+    //printf("%d\n", avail_str.size());
+    for (int i = 0; i < avail_str.size(); i++)
+    {
+        if (nums[avail_str[i]] >= count_thres)
+        {
+            selected_str.push_back(avail_str[i]);
+            continue;
+        }
+
+        //printf("avail_str: %d\n", avail_str[i]);
+        // printf("nums:\n");
+        // for (int i = 0; i < ids_total; i++)
+        //     printf("%d, ", nums[i]);
+        // printf("\n");
+                    
+        for (int j = 0; j < count_thres - 1; j++)
+        {
+            unsigned new_place = bi_search(*(skip_list[j].first), avail_str[i], search_place[j]);
+            if ((*skip_list[j].first)[new_place] == avail_str[i])
+            {
+                nums[avail_str[i]]++;
+                search_place[j] = new_place + 1;
+                if (nums[avail_str[i]] >= count_thres)
+                {
+                    selected_str.push_back(avail_str[i]);
+                    break;
+                }
+            }
+            else
+            {
+                search_place[j] = new_place;
+            }
+            
+        }
+    }
 }
 
 //寻找合适的出来的点，如果没有就返回前面一个
