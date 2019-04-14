@@ -3,7 +3,7 @@
 
 using namespace std;
 
-vector<unsigned> inverted_list_ed_hash[2222222];
+vector<unsigned>* inverted_list_ed_hash[2222222];
 
 SimSearcher::SimSearcher()
 {
@@ -52,7 +52,13 @@ int SimSearcher::createIndex(const char *filename, unsigned q)
         set<unsigned>::iterator it2;
         for (it2 = q_gram_set.begin(); it2 != q_gram_set.end(); it2++)
         {
-            inverted_list_ed_hash[*it2].push_back(tmp_num);
+            if (inverted_list_ed_hash[*it2] == NULL)
+            {
+                inverted_list_ed_hash[*it2] = new vector<unsigned>;
+                inverted_list_ed_hash[*it2]->push_back(tmp_num);
+            }
+            else
+                inverted_list_ed_hash[*it2]->push_back(tmp_num);
         }
 		tmp_num++;
 	}
@@ -77,8 +83,8 @@ int SimSearcher::searchED(const char *query, unsigned threshold, vector<pair<uns
 	result.clear();
 	string query_str = query;
 	
-    //search_ed_scancount(query_str, threshold, result);
-    search_ed_mergeopt(query_str, threshold, result);
+    search_ed_scancount(query_str, threshold, result);
+    //search_ed_mergeopt(query_str, threshold, result);
 	
 	return SUCCESS;
 }
@@ -273,8 +279,13 @@ void SimSearcher::search_ed_scancount(string query_str, unsigned threshold, vect
         {
             string q_gram = query_str.substr(i, q_num);
             unsigned hash_num = q_gram_hash(q_gram);
-            for (unsigned j = 0; j < inverted_list_ed_hash[hash_num].size(); j++)
-                nums[inverted_list_ed_hash[hash_num][j]]++;
+            vector<unsigned>* selected_list = inverted_list_ed_hash[hash_num];
+            if (selected_list != NULL)
+            {
+                for (unsigned j = 0; j < (*selected_list).size(); j++)
+                    nums[(*selected_list)[j]]++;
+            }
+            
         }
 
         for (unsigned i = 0; i < ids_total; i++)
@@ -313,7 +324,7 @@ void SimSearcher::search_ed_mergeopt(string query_str, unsigned threshold, vecto
     int least_common = query_str.size() - q_num + 1 - threshold * q_num;
     unsigned ids_total = strs.size();
     vector<unsigned> selected_str;
-    vector<vector<unsigned> > waiting_list;
+    vector<vector<unsigned>* > waiting_list;
     //printf("least_common: %d\n", least_common);
 
     if (least_common > 0)
@@ -322,15 +333,15 @@ void SimSearcher::search_ed_mergeopt(string query_str, unsigned threshold, vecto
         {
             string q_gram = query_str.substr(i, q_num);
             unsigned hash_num = q_gram_hash(q_gram);
-            vector<unsigned> selected_list = inverted_list_ed_hash[hash_num];
-            if (selected_list.size() > 0)
+            vector<unsigned>* selected_list = inverted_list_ed_hash[hash_num];
+            if (selected_list != NULL)
                 waiting_list.push_back(selected_list);
 
             // for (unsigned j = 0; j < inverted_list_ed_hash[hash_num].size(); j++)
             //     nums[inverted_list_ed_hash[hash_num][j]]++;
         }
 
-        // printf("begin!\n");
+        //printf("begin!\n");
         mergeopt(waiting_list, selected_str, least_common);
 
         // printf("size: %lu\n", selected_str.size());
@@ -367,7 +378,7 @@ void SimSearcher::search_ed_mergeopt(string query_str, unsigned threshold, vecto
     
 }
 
-void SimSearcher::mergeopt(vector<vector<unsigned> > &waiting_list, vector<unsigned> &selected_str, int count_thres)
+void SimSearcher::mergeopt(vector<vector<unsigned>* > &waiting_list, vector<unsigned> &selected_str, int count_thres)
 {
     // for (int i = 0; i < waiting_list.size(); i++)
     // {
@@ -421,9 +432,9 @@ void SimSearcher::mergeopt(vector<vector<unsigned> > &waiting_list, vector<unsig
         for (unsigned i = 0; i < need_to_search.size(); i++)
         {
             unsigned place = need_to_search[i];
-            if (waiting_place[place] < waiting_list[place].size())
+            if (waiting_place[place] < (*waiting_list[place]).size())
             {
-                unsigned tmp_str_num = waiting_list[place][waiting_place[place]];
+                unsigned tmp_str_num = (*waiting_list[place])[waiting_place[place]];
                 occur_str.insert(tmp_str_num);
                 occur_num[tmp_str_num]++;
                 num_to_list[tmp_str_num].push_back(place);
@@ -494,7 +505,7 @@ void SimSearcher::mergeopt(vector<vector<unsigned> > &waiting_list, vector<unsig
         for (unsigned i = 0; i < need_to_search.size(); i++)
         {
             unsigned place = need_to_search[i];
-            waiting_place[place] = bi_search(waiting_list[place], count_place, waiting_place[place]);
+            waiting_place[place] = bi_search(*waiting_list[place], count_place, waiting_place[place]);
         }
         //这轮就算完了应该
     }
@@ -556,7 +567,7 @@ void SimSearcher::mergeopt_cell_test()
 
     vector<unsigned> selected_str;
 
-    mergeopt(waiting_list, selected_str, 4);
+    //mergeopt(waiting_list, selected_str, 4);
 
     for (int i = 0; i < selected_str.size(); i++)
     {

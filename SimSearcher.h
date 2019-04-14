@@ -54,7 +54,7 @@ public:
     void search_ed_scancount(string query_str, unsigned threshold, vector<pair<unsigned, unsigned> > &result);
     void search_ed_mergeopt(string query_str, unsigned threshold, vector<pair<unsigned, unsigned> > &result);
 
-    void mergeopt(vector<vector<unsigned> > &waiting_list, vector<unsigned> &selected_str, int count_thres);
+    void mergeopt(vector<vector<unsigned>* > &waiting_list, vector<unsigned> &selected_str, int count_thres);
     unsigned bi_search(vector<unsigned> &one_list, unsigned one_place, unsigned start_place);
 
     void mergeopt_cell_test();
