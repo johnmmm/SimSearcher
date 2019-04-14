@@ -10,6 +10,11 @@ bool cmp2(pair<vector<unsigned>*, unsigned>a, pair<vector<unsigned>*, unsigned>b
     return a.second > b.second;
 }
 
+bool cmp3(pair<set<unsigned>*, unsigned>a, pair<set<unsigned>*, unsigned>b) //降序排序
+{
+    return a.second > b.second;
+}
+
 SimSearcher::SimSearcher()
 {
 }
@@ -42,7 +47,13 @@ int SimSearcher::createIndex(const char *filename, unsigned q)
         set<string>::iterator it1;
         for (it1 = tmp_tokens.begin(); it1 != tmp_tokens.end(); it1++)
         {
-            inverted_list_jac[jaccard_hash(*it1)].push_back(tmp_num);
+            if (inverted_list_jac[jaccard_hash(*it1)] == NULL)
+            {
+                inverted_list_jac[jaccard_hash(*it1)] = new vector<unsigned>;
+                inverted_list_jac[jaccard_hash(*it1)]->push_back(tmp_num);
+            }
+            else
+                inverted_list_jac[jaccard_hash(*it1)]->push_back(tmp_num);
             tmp_hash.insert(jaccard_hash(*it1));
         }
         str_tokens.push_back(tmp_hash);
@@ -78,7 +89,8 @@ int SimSearcher::searchJaccard(const char *query, double threshold, vector<pair<
     set<string> query_tokens;
     tokenize(query_str, query_tokens);
 
-    search_jac_scancount(query_tokens, threshold, result);
+    //search_jac_scancount(query_tokens, threshold, result);
+    search_jac_divideskip(query_tokens, threshold, result);
     
     return SUCCESS;
 }
@@ -141,6 +153,7 @@ double SimSearcher::new_jaccard_distance(set<unsigned long long> a, set<unsigned
     set_intersection(a.begin(), a.end(), 
                     b.begin(), b.end(), 
                     inserter(insection_result, insection_result.begin()));
+    cnt = insection_result.size();
     return ((double)cnt / (double)(size_a + size_b - cnt));
 }
 
@@ -249,9 +262,9 @@ void SimSearcher::search_jac_scancount(set<string> query_tokens, double threshol
     {
         unsigned long long tmp_long_long = jaccard_hash(*it1);
         query_hash.insert(tmp_long_long);
-        vector<unsigned> common_gram = inverted_list_jac[tmp_long_long];
-        for (unsigned j = 0; j < common_gram.size(); j++)
-            nums[common_gram[j]]++;
+        vector<unsigned>* common_gram = inverted_list_jac[tmp_long_long];
+        for (unsigned j = 0; j < (*common_gram).size(); j++)
+            nums[(*common_gram)[j]]++;
     }
 
     for (unsigned i = 0; i < ids_total; i++)
@@ -267,6 +280,44 @@ void SimSearcher::search_jac_scancount(set<string> query_tokens, double threshol
 			}
 		}
 	}
+}
+
+void SimSearcher::search_jac_divideskip(set<string> &query_tokens, double threshold, vector<pair<unsigned, double> > &result)
+{
+    unsigned str_size = query_tokens.size();
+    int least_common = (int)ceil( max(threshold*str_size, (str_size+s_min)*threshold/(1.0+threshold) ) );
+    unsigned ids_total = strs.size();
+	int nums[ids_total];
+	memset(nums, 0, sizeof(int)*ids_total);
+    set<unsigned long long> query_hash;
+    vector<unsigned> selected_str;
+    vector<pair<vector<unsigned>*, unsigned> > skip_list;
+
+    set<string>::iterator it1;
+    for (it1 = query_tokens.begin(); it1 != query_tokens.end(); it1++)
+    {
+        unsigned long long tmp_long_long = jaccard_hash(*it1);
+        query_hash.insert(tmp_long_long);
+        vector<unsigned>* selected_list = inverted_list_jac[tmp_long_long];
+        if (selected_list != NULL)
+        {
+            skip_list.push_back(make_pair(selected_list, (*selected_list).size()));
+        }
+    }
+
+    sort(skip_list.begin(), skip_list.end(), cmp2);
+    divideskip_jac(skip_list, selected_str, least_common, nums);
+
+    for (int i = 0; i < selected_str.size(); i++)
+    {
+        double distance = jaccard_distance(str_tokens[selected_str[i]], query_hash, nums[selected_str[i]]);
+        //double distance = new_jaccard_distance(str_tokens[selected_str[i]], query_hash);
+        //printf("%f\n", distance);
+        if (distance >= threshold)
+        {
+            result.push_back(make_pair(selected_str[i], distance));
+        }
+    }
 }
 
 void SimSearcher::search_ed_scancount(string query_str, unsigned threshold, vector<pair<unsigned, unsigned> > &result)
@@ -564,10 +615,78 @@ void SimSearcher::mergeopt(vector<vector<unsigned>* > &waiting_list, vector<unsi
     
 }
 
+void SimSearcher::divideskip_jac(vector<pair<vector<unsigned>*, unsigned> > &skip_list, vector<unsigned> &selected_str, int count_thres, int* nums)
+{
+    unsigned count_thres_plus;
+    if (count_thres <= 2)
+        count_thres_plus = 1;
+    else if (count_thres <= 4)
+        count_thres_plus = 2;
+    else 
+        count_thres_plus = 4;
+    unsigned ids_total = strs.size();
+    memset(nums, 0, sizeof(int)*ids_total);
+    int search_place[count_thres-1];
+    memset(search_place, 0, sizeof(int)*(count_thres-1));
+    vector<unsigned> avail_str;
+
+    //printf("scancount:\n");
+    //scancount
+    for (int i = count_thres - count_thres_plus; i < skip_list.size(); i++)
+    {
+        vector<unsigned>* tmp_pointer = skip_list[i].first;
+        for (unsigned j = 0; j < (*tmp_pointer).size(); j++)
+        {
+            nums[(*tmp_pointer)[j]]++;
+            if (nums[(*tmp_pointer)[j]] == count_thres_plus)
+            {
+                avail_str.push_back((*tmp_pointer)[j]);
+            }
+                
+        }      
+    }
+
+    sort(avail_str.begin(), avail_str.end());
+    int is_push[ids_total];
+    memset(is_push, 0, sizeof(int)*ids_total);
+
+    for (int i = 0; i < avail_str.size(); i++)
+    {
+        if (nums[avail_str[i]] >= count_thres)
+        {
+            selected_str.push_back(avail_str[i]);
+            continue;
+        }
+                    
+        for (int j = count_thres - count_thres_plus - 1; j >= 0; j--)
+        {
+            unsigned new_place = bi_search(*(skip_list[j].first), avail_str[i], search_place[j]);
+            if ((*skip_list[j].first)[new_place] == avail_str[i])
+            {
+                nums[avail_str[i]]++;
+                search_place[j] = new_place + 1;
+                if (nums[avail_str[i]] >= count_thres)
+                {
+                    if (is_push[avail_str[i]] == 0)
+                    {
+                        selected_str.push_back(avail_str[i]);
+                        is_push[avail_str[i]] = 1;
+                    }
+                        
+                }
+            }
+            else
+            {
+                search_place[j] = new_place;
+            }
+        }
+    }
+}
+
 void SimSearcher::divideskip(vector<pair<vector<unsigned>*, unsigned> > &skip_list, vector<unsigned> &selected_str, int count_thres)
 {
     unsigned count_thres_plus;
-    if (count_thres == 1)
+    if (count_thres <= 2)
         count_thres_plus = 1;
     else if (count_thres <= 4)
         count_thres_plus = 2;
@@ -591,52 +710,14 @@ void SimSearcher::divideskip(vector<pair<vector<unsigned>*, unsigned> > &skip_li
             if (nums[(*tmp_pointer)[j]] == count_thres_plus)
             {
                 selected_str.push_back((*tmp_pointer)[j]);
-                //avail_str.push_back((*tmp_pointer)[j]);
             }
                 
         }      
     }
+
+    //选择直接无视长链
     sort(selected_str.begin(), selected_str.end());
     return;
-    sort(avail_str.begin(), avail_str.end());
-
-    //printf("bi look up:\n");
-    //bi look up
-    //printf("%d\n", avail_str.size());
-    for (int i = 0; i < avail_str.size(); i++)
-    {
-        if (nums[avail_str[i]] >= count_thres)
-        {
-            selected_str.push_back(avail_str[i]);
-            continue;
-        }
-
-        //printf("avail_str: %d\n", avail_str[i]);
-        // printf("nums:\n");
-        // for (int i = 0; i < ids_total; i++)
-        //     printf("%d, ", nums[i]);
-        // printf("\n");
-                    
-        for (int j = count_thres - count_thres_plus - 1; j >= 0; j--)
-        {
-            unsigned new_place = bi_search(*(skip_list[j].first), avail_str[i], search_place[j]);
-            if ((*skip_list[j].first)[new_place] == avail_str[i])
-            {
-                nums[avail_str[i]]++;
-                search_place[j] = new_place + 1;
-                if (nums[avail_str[i]] >= count_thres)
-                {
-                    selected_str.push_back(avail_str[i]);
-                    break;
-                }
-            }
-            else
-            {
-                search_place[j] = new_place;
-            }
-            
-        }
-    }
 }
 
 //寻找合适的出来的点，如果没有就返回前面一个

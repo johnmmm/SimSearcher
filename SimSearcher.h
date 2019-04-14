@@ -28,7 +28,7 @@ public:
     vector<set<unsigned long long> > str_tokens;
     set<string> strs_tokens;
     set<unsigned long long> strs_hash;  
-    map<unsigned long long, vector<unsigned> > inverted_list_jac;
+    map<unsigned long long, vector<unsigned>* > inverted_list_jac;
 	map<string, vector<unsigned> > inverted_list_ed;
     
 	unsigned q_num;
@@ -51,11 +51,13 @@ public:
     unsigned q_gram_hash(string strs);
 
     void search_jac_scancount(set<string> query_tokens, double threshold, vector<pair<unsigned, double> > &result);
+    void search_jac_divideskip(set<string> &query_tokens, double threshold, vector<pair<unsigned, double> > &result);
     void search_ed_scancount(string query_str, unsigned threshold, vector<pair<unsigned, unsigned> > &result);
     void search_ed_mergeopt(string query_str, unsigned threshold, vector<pair<unsigned, unsigned> > &result);
     void search_ed_divideskip(string query_str, unsigned threshold, vector<pair<unsigned, unsigned> > &result);
 
     void mergeopt(vector<vector<unsigned>* > &waiting_list, vector<unsigned> &selected_str, int count_thres);
+    void divideskip_jac(vector<pair<vector<unsigned>*, unsigned> > &skip_list, vector<unsigned> &selected_str, int count_thres, int* nums);
     void divideskip(vector<pair<vector<unsigned>*, unsigned> > &skip_list, vector<unsigned> &selected_str, int count_thres);
     unsigned bi_search(vector<unsigned> &one_list, unsigned one_place, unsigned start_place);
 
